@@ -1,0 +1,47 @@
+# Claude agent internal files
+.claude/
+
+# Skills lock file (local install metadata)
+skills-lock.json
+
+# Docs (requirements/spec kept locally, not in repo)
+REQUIREMENTS.md
+
+# Python (fxhedging prototype)
+fxhedging/__pycache__/
+fxhedging/*.pyc
+fxhedging/.venv/
+fxhedging/venv/
+fxhedging/.env
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Next.js
+web/.next/
+web/out/
+web/build/
+
+# Dependencies
+web/node_modules/
+
+# Env files
+web/.env
+web/.env.local
+web/.env.*.local
+
+# Generated Prisma client
+web/src/generated/
+
+# Vercel
+web/.vercel
+
+# TypeScript
+web/*.tsbuildinfo
+web/next-env.d.ts
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*

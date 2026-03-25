@@ -1,0 +1,322 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// AUTH (NextAuth.js / Auth.js v5)
+// ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(CLIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  organizationMember OrganizationMember[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  CLIENT
+  ADMIN
+}
+
+// ─────────────────────────────────────────────
+// MULTI-TENANT: ORGANIZATION
+// ─────────────────────────────────────────────
+
+model Organization {
+  id                 String   @id @default(cuid())
+  name               String
+  baseCurrency       String   @default("MXN")
+  reportingCurrency  String   @default("USD")
+  timezone           String   @default("America/Mexico_City")
+  operatingCountries String[] @default([])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members            OrganizationMember[]
+  exposures          Exposure[]
+  uploads            Upload[]
+  mappingTemplates   MappingTemplate[]
+  trades             Trade[]
+  providers          Provider[]
+  simulationSettings SimulationSettings?
+  uploadSettings     UploadSettings?
+}
+
+model OrganizationMember {
+  id             String  @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole @default(MEMBER)
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─────────────────────────────────────────────
+// EXPOSURE TRACKER
+// ─────────────────────────────────────────────
+
+model Exposure {
+  id                String         @id @default(cuid())
+  organizationId    String
+  entity            String?
+  subsidiary        String?
+  counterparty      String?
+  currency          String
+  amount            Decimal        @db.Decimal(20, 6)
+  direction         Direction
+  settlementDate    DateTime
+  invoiceId         String?
+  referenceId       String?
+  description       String?
+  notes             String?
+  uploadSource      UploadSource   @default(MANUAL)
+  uploadId          String?
+  mappingTemplateId String?
+  status            ExposureStatus @default(ACTIVE)
+  hedgingStatus     HedgingStatus  @default(UNHEDGED)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  upload          Upload?          @relation(fields: [uploadId], references: [id])
+  mappingTemplate MappingTemplate? @relation(fields: [mappingTemplateId], references: [id])
+  auditLog        ExposureAuditLog[]
+
+  @@index([organizationId])
+  @@index([settlementDate])
+  @@index([currency])
+  @@index([status])
+}
+
+model Upload {
+  id             String   @id @default(cuid())
+  organizationId String
+  fileName       String
+  fileType       String
+  blobUrl        String
+  rowCount       Int?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exposures    Exposure[]
+}
+
+model ExposureAuditLog {
+  id         String   @id @default(cuid())
+  exposureId String
+  action     String
+  changedBy  String
+  diff       Json?
+  createdAt  DateTime @default(now())
+
+  exposure Exposure @relation(fields: [exposureId], references: [id], onDelete: Cascade)
+}
+
+model MappingTemplate {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String
+  columnMap       Json
+  dateFormat      String?
+  amountFormat    String?
+  directionLabels Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exposures    Exposure[]
+}
+
+enum Direction {
+  PAY
+  RECEIVE
+}
+
+enum UploadSource {
+  CSV
+  EXCEL
+  MANUAL
+}
+
+enum ExposureStatus {
+  ACTIVE
+  SETTLED
+  CANCELLED
+}
+
+enum HedgingStatus {
+  HEDGED
+  UNHEDGED
+  NO_EXPOSURE
+}
+
+// ─────────────────────────────────────────────
+// TRADES (FORWARDS + SPOTS)
+// ─────────────────────────────────────────────
+
+model Trade {
+  id                String         @id @default(cuid())
+  organizationId    String
+  tradeType         TradeType
+  currencyPair      String
+  direction         TradeDirection
+  notional          Decimal        @db.Decimal(20, 6)
+  rate              Decimal?       @db.Decimal(20, 8)
+  tradeDate         DateTime?
+  settlementDate    DateTime
+  providerId        String?
+  markToMarket      Decimal?       @db.Decimal(20, 6)
+  status            TradeStatus    @default(DRAFT)
+  notes             String?
+  requestId         String?
+  quoteStatus       String?
+  executionStatus   String?
+  quoteResponse     Json?
+  executionResponse Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider     Provider?    @relation(fields: [providerId], references: [id])
+
+  @@index([organizationId])
+  @@index([tradeType])
+  @@index([status])
+  @@index([settlementDate])
+}
+
+enum TradeType {
+  FORWARD
+  SPOT
+}
+
+enum TradeDirection {
+  BUY
+  SELL
+}
+
+enum TradeStatus {
+  DRAFT
+  PENDING_QUOTE
+  QUOTED
+  PENDING_EXECUTION
+  ACTIVE
+  SETTLED
+  CANCELLED
+}
+
+// ─────────────────────────────────────────────
+// PROVIDER (BANK API CONNECTIVITY)
+// ─────────────────────────────────────────────
+
+model Provider {
+  id                 String      @id @default(cuid())
+  organizationId     String
+  name               String
+  apiKeyEncrypted    String?     @db.Text
+  accountId          String?
+  active             Boolean     @default(false)
+  environment        ProviderEnv @default(SANDBOX)
+  connectivityStatus String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  trades       Trade[]
+}
+
+enum ProviderEnv {
+  SANDBOX
+  PRODUCTION
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────
+
+model SimulationSettings {
+  id                  String   @id @default(cuid())
+  organizationId      String   @unique
+  preferredDataSource String   @default("banxico")
+  defaultHedgeRatios  Float[]  @default([0, 0.5, 1.0])
+  defaultTenorDays    Int      @default(30)
+  showDisclosure      Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model UploadSettings {
+  id                    String   @id @default(cuid())
+  organizationId        String   @unique
+  defaultDateFormat     String   @default("YYYY-MM-DD")
+  defaultAmountFormat   String   @default("1000000.00")
+  directionPayLabel     String   @default("Payable")
+  directionReceiveLabel String   @default("Receivable")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
