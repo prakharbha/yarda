@@ -6,9 +6,10 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL!,
-  })
+  // Vercel sets POSTGRES_URL as the direct connection string
+  // Fall back to DATABASE_URL for local dev
+  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL!
+  const adapter = new PrismaPg({ connectionString })
   return new PrismaClient({ adapter })
 }
 
