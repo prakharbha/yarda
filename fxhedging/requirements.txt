@@ -1,5 +1,0 @@
-streamlit
-pandas
-oandapyV20
-matplotlib
-seaborn
