@@ -90,6 +90,7 @@ model Organization {
   providers          Provider[]
   simulationSettings SimulationSettings?
   uploadSettings     UploadSettings?
+  currencyBalances   CurrencyBalance[]
 }
 
 model OrganizationMember {
@@ -319,4 +320,21 @@ model UploadSettings {
   updatedAt             DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// SPOT WALLET: CURRENCY BALANCES
+// ─────────────────────────────────────────────
+
+model CurrencyBalance {
+  id             String   @id @default(cuid())
+  organizationId String
+  currency       String
+  balance        Decimal  @default(0) @db.Decimal(20, 6)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, currency])
+  @@index([organizationId])
 }
