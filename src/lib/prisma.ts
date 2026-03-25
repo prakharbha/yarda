@@ -8,11 +8,8 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): PrismaClient {
   const dbUrl = process.env.DATABASE_URL ?? ""
-  const pgUrl = process.env.POSTGRES_URL ?? ""
-  console.log("[prisma] DATABASE_URL prefix:", dbUrl.slice(0, 30) || "(empty)")
-  console.log("[prisma] POSTGRES_URL prefix:", pgUrl.slice(0, 30) || "(empty)")
 
-  // Vercel Prisma Postgres sets DATABASE_URL to an Accelerate URL (prisma+postgres://...)
+  // Vercel Prisma Postgres: DATABASE_URL is the Accelerate URL (prisma+postgres://...)
   if (dbUrl.startsWith("prisma")) {
     return new PrismaClient({ accelerateUrl: dbUrl })
       .$extends(withAccelerate()) as unknown as PrismaClient
