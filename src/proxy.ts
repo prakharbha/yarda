@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getToken } from "next-auth/jwt"
+import { auth } from "@/lib/auth"
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -9,12 +9,8 @@ export async function proxy(req: NextRequest) {
 
   if (isApiAuth || pathname === "/api/health") return NextResponse.next()
 
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET,
-  })
-
-  const isLoggedIn = !!token
+  const session = await auth()
+  const isLoggedIn = !!session?.user
 
   if (isAuthPage) {
     if (isLoggedIn) return NextResponse.redirect(new URL("/", req.url))
