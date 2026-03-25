@@ -3,7 +3,6 @@
 import { signIn } from "@/lib/auth"
 import { AuthError } from "next-auth"
 import { z } from "zod"
-import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
@@ -52,7 +51,7 @@ export async function signInAction(
     await signIn("credentials", {
       email: validated.data.email,
       password: validated.data.password,
-      redirect: false,
+      redirectTo: "/",
     })
   } catch (error) {
     if (error instanceof AuthError) {
@@ -60,8 +59,6 @@ export async function signInAction(
     }
     throw error
   }
-
-  redirect("/")
 }
 
 export async function signUpAction(
@@ -102,7 +99,5 @@ export async function signUpAction(
     })
   })
 
-  await signIn("credentials", { email, password, redirect: false })
-
-  redirect("/")
+  await signIn("credentials", { email, password, redirectTo: "/" })
 }
