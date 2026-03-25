@@ -259,8 +259,30 @@ export function SimulatorPage() {
           </Button>
         </div>
 
-        {marketError && <p className="text-xs text-red-500">{marketError}</p>}
-        {simError && <p className="text-xs text-red-500">{simError}</p>}
+        {/* Plain-English summary of inputs */}
+        {notional && settlementDate && (
+          <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            Your business will{" "}
+            <strong>{direction === "pay" ? "pay" : "receive"}</strong>{" "}
+            <strong>{Number(notional).toLocaleString()} {foreignCurrency}</strong>{" "}
+            in exchange for <strong>{localCurrency}</strong> on{" "}
+            <strong>{new Date(settlementDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>.
+            {!marketData && " Load market data to run the simulation."}
+          </p>
+        )}
+
+        {marketError && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+            <span className="text-red-500 text-base leading-none mt-0.5">⚠</span>
+            <p className="text-xs text-red-700">{marketError}</p>
+          </div>
+        )}
+        {simError && (
+          <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5">
+            <span className="text-red-500 text-base leading-none mt-0.5">⚠</span>
+            <p className="text-xs text-red-700">{simError}</p>
+          </div>
+        )}
       </div>
 
       {/* Market data snapshot */}

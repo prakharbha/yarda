@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -77,6 +78,9 @@ export function UploadDialog({ open, onClose, onComplete, mappingTemplates }: Pr
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [selectedTemplate, setSelectedTemplate] = useState<string>("")
   const [saving, setSaving] = useState(false)
+  const [templateName, setTemplateName] = useState("")
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateSaved, setTemplateSaved] = useState(false)
   const [createdRows, setCreatedRows] = useState<ExposureRow[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -89,6 +93,9 @@ export function UploadDialog({ open, onClose, onComplete, mappingTemplates }: Pr
     setUploadResponse(null)
     setMapping({})
     setSelectedTemplate("")
+    setTemplateName("")
+    setSavingTemplate(false)
+    setTemplateSaved(false)
     setCreatedRows([])
   }
 
@@ -187,6 +194,23 @@ export function UploadDialog({ open, onClose, onComplete, mappingTemplates }: Pr
       setUploadError("Unexpected error.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim() || Object.keys(mapping).length === 0) return
+    setSavingTemplate(true)
+    try {
+      const res = await fetch("/api/mappingtemplates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: templateName.trim(), columnMap: mapping }),
+      })
+      if (res.ok) setTemplateSaved(true)
+    } catch {
+      // ignore
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
@@ -340,6 +364,25 @@ export function UploadDialog({ open, onClose, onComplete, mappingTemplates }: Pr
                 Map all required fields to continue.
               </p>
             )}
+
+            {/* Save as template */}
+            <div className="flex items-center gap-2 pt-1">
+              <Input
+                value={templateName}
+                onChange={(e) => { setTemplateName(e.target.value); setTemplateSaved(false) }}
+                placeholder="Save mapping as template (optional name)..."
+                className="h-8 text-xs flex-1"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs shrink-0"
+                disabled={!templateName.trim() || savingTemplate || templateSaved}
+                onClick={handleSaveTemplate}
+              >
+                {templateSaved ? "Saved!" : savingTemplate ? "Saving..." : "Save template"}
+              </Button>
+            </div>
 
             <div className="flex justify-between gap-2">
               <Button variant="outline" size="sm" onClick={() => setStep("upload")}>Back</Button>

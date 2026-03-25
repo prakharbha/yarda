@@ -3,14 +3,15 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
-async function getOrgId() {
+async function getSession() {
   const session = await auth()
   if (!session?.user?.id) return null
   const member = await prisma.organizationMember.findFirst({
     where: { userId: session.user.id },
     select: { organizationId: true },
   })
-  return member?.organizationId ?? null
+  if (!member) return null
+  return { userId: session.user.id, orgId: member.organizationId }
 }
 
 const patchSchema = z.object({
@@ -28,8 +29,9 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgId = await getOrgId()
-  if (!orgId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const sess = await getSession()
+  if (!sess) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { orgId, userId } = sess
 
   const { id } = await params
   const body = await req.json()
@@ -48,6 +50,16 @@ export async function PATCH(
     },
   })
 
+  // Write audit log entry
+  await prisma.exposureAuditLog.create({
+    data: {
+      exposureId: id,
+      action: "UPDATE",
+      changedBy: userId,
+      diff: parsed.data,
+    },
+  })
+
   return NextResponse.json({ ...updated, amount: updated.amount.toString() })
 }
 
@@ -55,8 +67,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const orgId = await getOrgId()
-  if (!orgId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const sess = await getSession()
+  if (!sess) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { orgId } = sess
 
   const { id } = await params
 

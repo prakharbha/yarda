@@ -196,6 +196,20 @@ export function ExposureTable({ exposures, onDelete, onUpdate }: Props) {
       sortingFn: (a, b) =>
         new Date(a.original.settlementDate).getTime() - new Date(b.original.settlementDate).getTime(),
     }),
+    columnHelper.display({
+      id: "daysToMaturity",
+      header: () => <span className="text-xs font-medium text-gray-500">Days</span>,
+      cell: ({ row }) => {
+        const days = Math.ceil(
+          (new Date(row.original.settlementDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        )
+        return (
+          <span className={`text-sm font-mono ${days < 0 ? "text-red-500" : days <= 30 ? "text-amber-600" : "text-gray-600"}`}>
+            {days < 0 ? `${Math.abs(days)}d ago` : `${days}d`}
+          </span>
+        )
+      },
+    }),
     columnHelper.accessor("entity", {
       header: () => <span className="text-xs font-medium text-gray-500">Entity</span>,
       cell: ({ row }) => {
