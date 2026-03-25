@@ -7,7 +7,7 @@ export async function proxy(req: NextRequest) {
   const isAuthPage = pathname === "/login" || pathname === "/signup"
   const isApiAuth = pathname.startsWith("/api/auth")
 
-  if (isApiAuth) return NextResponse.next()
+  if (isApiAuth || pathname === "/api/health") return NextResponse.next()
 
   const token = await getToken({
     req,
