@@ -71,7 +71,12 @@ export default async function DashboardPage() {
             ...e,
             amount: e.amount.toString(),
           }))}
-          trades={trades}
+          trades={trades.map((t) => ({
+            ...t,
+            notional: t.notional.toString(),
+            rate: t.rate?.toString() ?? null,
+            markToMarket: t.markToMarket?.toString() ?? null,
+          }))}
         />
       </div>
 
