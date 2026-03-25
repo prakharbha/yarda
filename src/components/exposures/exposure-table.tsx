@@ -11,7 +11,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table"
 import { format } from "date-fns"
-import { ArrowUpDown, Pencil, Trash2, Check, X } from "lucide-react"
+import { ArrowUpDown, Pencil, Trash2, Check, X, TrendingUp } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -56,11 +57,22 @@ function DirectionBadge({ direction }: { direction: string }) {
 }
 
 export function ExposureTable({ exposures, onDelete, onUpdate }: Props) {
+  const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Partial<ExposureRow>>({})
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const simulateExposure = (row: ExposureRow) => {
+    const params = new URLSearchParams({
+      direction: row.direction === "PAY" ? "pay" : "receive",
+      currency: row.currency,
+      notional: String(Math.abs(Number(row.amount))),
+      settlement: new Date(row.settlementDate).toISOString().split("T")[0],
+    })
+    router.push(`/simulators?${params.toString()}`)
+  }
 
   const startEdit = (row: ExposureRow) => {
     setEditingId(row.id)
@@ -233,6 +245,10 @@ export function ExposureTable({ exposures, onDelete, onUpdate }: Props) {
         }
         return (
           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-gray-400 hover:text-indigo-600"
+              title="Simulate hedge" onClick={() => simulateExposure(row.original)}>
+              <TrendingUp className="h-3.5 w-3.5" />
+            </Button>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-gray-400 hover:text-gray-600"
               onClick={() => startEdit(row.original)}>
               <Pencil className="h-3.5 w-3.5" />

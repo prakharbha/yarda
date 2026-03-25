@@ -6,7 +6,18 @@ import { Plus } from "lucide-react"
 import { ForwardsTable } from "./forwards-table"
 import { AddTradeDialog } from "./add-trade-dialog"
 import { toast } from "sonner"
-import { format } from "date-fns"
+import { format, addMonths, startOfMonth } from "date-fns"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts"
 
 interface TradeRow {
   id: string
@@ -79,6 +90,41 @@ export function SpotsWallet({ initialTrades, providers }: Props) {
     if (!prev || sd < prev) summaryByPair[t.currencyPair].nextSettlement = sd
   }
 
+  // Build wallet value chart: 12 months back + 6 months forward
+  const chartData = (() => {
+    const now = new Date()
+    const months: { label: string; date: Date }[] = []
+    for (let i = -12; i <= 6; i++) {
+      const d = startOfMonth(addMonths(now, i))
+      months.push({ label: format(d, "MMM yy"), date: d })
+    }
+
+    return months.map(({ label, date }) => {
+      const isFuture = date > now
+      // Wallet value: cumulative notional of ACTIVE trades settled on or before this month
+      const walletValue = trades
+        .filter((t) => t.status === "ACTIVE" && new Date(t.settlementDate) <= addMonths(date, 1))
+        .reduce((sum, t) => sum + (t.direction === "BUY" ? Number(t.notional) : -Number(t.notional)), 0)
+      // Projected: extend wallet value forward with pending/draft trades
+      const projected = trades
+        .filter((t) => ["ACTIVE", "DRAFT", "PENDING_QUOTE"].includes(t.status) && new Date(t.settlementDate) <= addMonths(date, 1))
+        .reduce((sum, t) => sum + (t.direction === "BUY" ? Number(t.notional) : -Number(t.notional)), 0)
+      // Unhedged: only include trades that were not hedged (DRAFT)
+      const unhedged = trades
+        .filter((t) => t.status === "DRAFT" && new Date(t.settlementDate) <= addMonths(date, 1))
+        .reduce((sum, t) => sum + (t.direction === "BUY" ? Number(t.notional) : -Number(t.notional)), 0)
+
+      return {
+        label,
+        ...(isFuture ? {} : { "Wallet Value": walletValue }),
+        Projected: projected,
+        "Unhedged Exposure": unhedged,
+      }
+    })
+  })()
+
+  const hasChartData = trades.length > 0
+
   return (
     <div className="space-y-4 max-w-7xl">
       <div className="flex items-center justify-between">
@@ -114,8 +160,30 @@ export function SpotsWallet({ initialTrades, providers }: Props) {
         </div>
       )}
 
+      {hasChartData && (
+        <div className="bg-white rounded-xl border p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">FX Wallet Value Over Time</h2>
+          <p className="text-xs text-gray-400 mb-4">Cumulative notional in base currency. Projected includes draft and pending trades.</p>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={2} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v) => [Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 })]} contentStyle={{ fontSize: 11 }} />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Line type="monotone" dataKey="Wallet Value" stroke="#6366f1" strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="Projected" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="4 2" connectNulls />
+                <Line type="monotone" dataKey="Unhedged Exposure" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="2 2" connectNulls />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border">
-        <ForwardsTable trades={trades} onDelete={handleDelete} onUpdate={handleUpdate} />
+        <ForwardsTable trades={trades} onDelete={handleDelete} onUpdate={handleUpdate} emptyMessage="No spot trades found." searchPlaceholder="Search spot trades..." />
       </div>
 
       <AddTradeDialog

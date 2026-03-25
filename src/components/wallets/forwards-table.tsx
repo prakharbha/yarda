@@ -41,6 +41,8 @@ interface Props {
   trades: TradeRow[]
   onDelete: (id: string) => Promise<void>
   onUpdate: (id: string, data: Partial<TradeRow>) => Promise<void>
+  emptyMessage?: string
+  searchPlaceholder?: string
 }
 
 const columnHelper = createColumnHelper<TradeRow>()
@@ -63,7 +65,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function ForwardsTable({ trades, onDelete, onUpdate }: Props) {
+export function ForwardsTable({ trades, onDelete, onUpdate, emptyMessage, searchPlaceholder }: Props) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -234,7 +236,7 @@ export function ForwardsTable({ trades, onDelete, onUpdate }: Props) {
   return (
     <div>
       <div className="px-4 py-3 border-b">
-        <Input placeholder="Search forwards..." value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-8 w-64 text-sm" />
+        <Input placeholder={searchPlaceholder ?? "Search forwards..."} value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} className="h-8 w-64 text-sm" />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -249,7 +251,7 @@ export function ForwardsTable({ trades, onDelete, onUpdate }: Props) {
           </thead>
           <tbody>
             {table.getRowModel().rows.length === 0 ? (
-              <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-gray-400">No forwards found.</td></tr>
+              <tr><td colSpan={columns.length} className="px-4 py-12 text-center text-sm text-gray-400">{emptyMessage ?? "No forwards found."}</td></tr>
             ) : (
               table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="border-b last:border-0 hover:bg-gray-50/50 group">

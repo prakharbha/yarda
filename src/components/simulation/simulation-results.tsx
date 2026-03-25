@@ -1,5 +1,9 @@
 "use client"
 
+import { useState } from "react"
+import { Download } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import {
   BarChart,
   Bar,
@@ -46,6 +50,7 @@ interface Props {
   result: SimulationOutput
   direction: string
   foreignCurrency: string
+  settlementDate: string
 }
 
 const STRATEGY_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
@@ -74,8 +79,41 @@ function buildHistogramData(values: number[], bins = 40): { bin: string; count: 
   }))
 }
 
-export function SimulationResults({ result, direction, foreignCurrency }: Props) {
+export function SimulationResults({ result, direction, foreignCurrency, settlementDate }: Props) {
   const { pricing, summary, distributionData, scenarioCount, localCurrency, notional, hedgeRatios } = result
+  const [saving, setSaving] = useState(false)
+
+  const saveAsDraftForward = async () => {
+    setSaving(true)
+    try {
+      const currencyPair = direction === "pay"
+        ? `${foreignCurrency}${localCurrency}`
+        : `${localCurrency}${foreignCurrency}`
+      const res = await fetch("/api/trades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tradeType: "FORWARD",
+          currencyPair,
+          direction: direction === "pay" ? "BUY" : "SELL",
+          notional,
+          rate: pricing.forwardRate,
+          settlementDate,
+          status: "DRAFT",
+          notes: `Draft from simulation. Forward rate: ${pricing.forwardRate.toFixed(4)}`,
+        }),
+      })
+      if (res.ok) {
+        toast.success("Draft forward saved to Forwards Wallet.")
+      } else {
+        toast.error("Failed to save draft forward.")
+      }
+    } catch {
+      toast.error("Unexpected error saving draft.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const strategyLabel = (key: string) => {
     const ratio = parseInt(key)
@@ -89,6 +127,23 @@ export function SimulationResults({ result, direction, foreignCurrency }: Props)
     const hist = buildHistogramData(values, 30)
     return { key, label: strategyLabel(key), hist, color: STRATEGY_COLORS[idx % STRATEGY_COLORS.length] }
   })
+
+  const downloadCSV = () => {
+    const header = ["Strategy", "Worst Case", "P5", "Median", "Average", "P95", "Best Case"]
+    const rows = hedgeRatios.map((ratio) => {
+      const key = String(Math.round(ratio * 100))
+      const s = summary[key]
+      return [strategyLabel(key), s.worst, s.p5, s.median, s.average, s.p95, s.best].join(",")
+    })
+    const csv = [header.join(","), ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "simulation-results.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   // Summary table data
   const summaryRows = hedgeRatios.map((ratio, idx) => {
@@ -120,19 +175,30 @@ export function SimulationResults({ result, direction, foreignCurrency }: Props)
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">
-          Hedge recommendation: to fully hedge, your company should{" "}
-          <strong>{direction === "pay" ? "buy" : "sell"}</strong>{" "}
-          {Number(notional).toLocaleString()} {foreignCurrency} forward at{" "}
-          <span className="font-mono">{pricing.forwardRate.toFixed(4)}</span>.
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-gray-400">
+            Hedge recommendation: to fully hedge, your company should{" "}
+            <strong>{direction === "pay" ? "buy" : "sell"}</strong>{" "}
+            {Number(notional).toLocaleString()} {foreignCurrency} forward at{" "}
+            <span className="font-mono">{pricing.forwardRate.toFixed(4)}</span>.
+          </p>
+          <Button size="sm" variant="outline" onClick={saveAsDraftForward} disabled={saving} className="ml-4 shrink-0 text-xs h-7">
+            {saving ? "Saving..." : "Save as draft forward"}
+          </Button>
+        </div>
       </div>
 
       {/* Simulation details */}
       <div className="bg-white rounded-xl border p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700">Simulation Summary</h2>
-          <span className="text-xs text-gray-400">{scenarioCount.toLocaleString()} historical scenarios · Banxico FIX history</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400">{scenarioCount.toLocaleString()} historical scenarios · Banxico FIX history</span>
+            <Button size="sm" variant="outline" onClick={downloadCSV} className="h-7 text-xs gap-1.5">
+              <Download className="h-3.5 w-3.5" />
+              Download CSV
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

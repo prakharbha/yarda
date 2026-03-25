@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -49,13 +50,36 @@ const HEDGE_RATIO_OPTIONS = [
 ]
 
 export function SimulatorPage() {
-  // Inputs
-  const [direction, setDirection] = useState<"pay" | "receive">("pay")
-  const [foreignCurrency, setForeignCurrency] = useState("USD")
+  const searchParams = useSearchParams()
+
+  // Inputs — pre-fill from URL params if coming from Exposure Tracker
+  const defaultDirection = (searchParams.get("direction") as "pay" | "receive") ?? "pay"
+  const defaultCurrency = searchParams.get("currency") ?? "USD"
+  const defaultNotional = searchParams.get("notional") ?? "1000000"
+  const defaultSettlement = searchParams.get("settlement") ?? (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 30)
+    return d.toISOString().split("T")[0]
+  })()
+
+  const [direction, setDirection] = useState<"pay" | "receive">(defaultDirection)
+  const [foreignCurrency, setForeignCurrency] = useState(defaultCurrency)
   const [localCurrency, setLocalCurrency] = useState("MXN")
-  const [notional, setNotional] = useState("1000000")
-  const [settlementDate, setSettlementDate] = useState("")
+  const [notional, setNotional] = useState(defaultNotional)
+  const [settlementDate, setSettlementDate] = useState(defaultSettlement)
   const [selectedRatios, setSelectedRatios] = useState<number[]>([0, 0.5, 1.0])
+
+  // Re-apply URL params if they change (navigation from exposure)
+  useEffect(() => {
+    const dir = searchParams.get("direction") as "pay" | "receive" | null
+    const cur = searchParams.get("currency")
+    const not = searchParams.get("notional")
+    const set = searchParams.get("settlement")
+    if (dir) setDirection(dir)
+    if (cur) setForeignCurrency(cur)
+    if (not) setNotional(not)
+    if (set) setSettlementDate(set)
+  }, [searchParams])
 
   // State
   const [marketData, setMarketData] = useState<MarketData | null>(null)
@@ -64,13 +88,6 @@ export function SimulatorPage() {
   const [simResult, setSimResult] = useState<SimulationOutput | null>(null)
   const [simLoading, setSimLoading] = useState(false)
   const [simError, setSimError] = useState<string | null>(null)
-
-  // Set default settlement date (30 days from today)
-  if (!settlementDate) {
-    const d = new Date()
-    d.setDate(d.getDate() + 30)
-    setSettlementDate(d.toISOString().split("T")[0])
-  }
 
   const fetchMarketData = async () => {
     setMarketLoading(true)
@@ -269,7 +286,7 @@ export function SimulatorPage() {
 
       {/* Simulation results */}
       {simResult && (
-        <SimulationResults result={simResult} direction={direction} foreignCurrency={foreignCurrency} />
+        <SimulationResults result={simResult} direction={direction} foreignCurrency={foreignCurrency} settlementDate={settlementDate} />
       )}
     </div>
   )
