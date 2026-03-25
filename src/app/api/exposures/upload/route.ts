@@ -71,16 +71,35 @@ export async function POST(req: NextRequest) {
     return mapped
   })
 
+  // Step 1 (no mapping): just return headers for column mapping UI — don't persist anything
+  if (Object.keys(mapping).length === 0) {
+    return NextResponse.json({
+      uploadId: "",
+      totalRows: rawRows.length,
+      validRows: 0,
+      invalidRows: 0,
+      errors: [],
+      headers: rawRows.length > 0 ? Object.keys(rawRows[0]) : [],
+      rows: [],
+    })
+  }
+
   // Validate rows
   const validationResults = mappedRows.map((row, i) => validateRow(row, i))
   const validRows = validationResults.filter((r) => r.valid)
   const invalidRows = validationResults.filter((r) => !r.valid)
 
-  // Store original file to Vercel Blob
-  const blob = await put(`exposures/${orgId}/${Date.now()}-${file.name}`, buffer, {
-    access: "private",
-    contentType: file.type,
-  })
+  // Store original file to Vercel Blob (skip gracefully if token not set)
+  let blobUrl = ""
+  try {
+    const blob = await put(`exposures/${orgId}/${Date.now()}-${file.name}`, buffer, {
+      access: "private",
+      contentType: file.type,
+    })
+    blobUrl = blob.url
+  } catch {
+    // Blob storage unavailable (e.g. local dev without BLOB_READ_WRITE_TOKEN) — continue without storing file
+  }
 
   // Create Upload record
   const upload = await prisma.upload.create({
@@ -88,7 +107,7 @@ export async function POST(req: NextRequest) {
       organizationId: orgId,
       fileName: file.name,
       fileType,
-      blobUrl: blob.url,
+      blobUrl,
       rowCount: rawRows.length,
     },
   })
