@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   const isAuthPage = pathname === "/login" || pathname === "/signup"
   const isApiAuth = pathname.startsWith("/api/auth")
 
-  // Allow static files, auth pages, auth API
   if (isApiAuth) return NextResponse.next()
 
   const token = await getToken({
