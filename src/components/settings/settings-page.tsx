@@ -23,6 +23,11 @@ interface Org {
   operatingCountries: string[]
 }
 
+interface MappingTemplate {
+  id: string
+  name: string
+}
+
 interface UserData {
   id: string
   name: string | null
@@ -57,6 +62,7 @@ interface Props {
   providers: Provider[]
   simSettings: SimSettings | null
   uploadSettings: UploadSettingsData | null
+  mappingTemplates: MappingTemplate[]
 }
 
 type Tab = "company" | "user" | "providers" | "simulation" | "upload"
@@ -82,7 +88,7 @@ const TIMEZONES = [
 
 const CURRENCIES = ["MXN", "USD", "EUR", "BRL", "COP", "CLP", "PEN", "ARS"]
 
-export function SettingsPage({ org, user, providers: initialProviders, simSettings, uploadSettings }: Props) {
+export function SettingsPage({ org, user, providers: initialProviders, simSettings, uploadSettings, mappingTemplates: initialTemplates }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("company")
   const [saving, setSaving] = useState(false)
   const [providers, setProviders] = useState<Provider[]>(initialProviders)
@@ -92,6 +98,11 @@ export function SettingsPage({ org, user, providers: initialProviders, simSettin
   const [baseCurrency, setBaseCurrency] = useState(org?.baseCurrency ?? "MXN")
   const [reportingCurrency, setReportingCurrency] = useState(org?.reportingCurrency ?? "USD")
   const [timezone, setTimezone] = useState(org?.timezone ?? "America/Mexico_City")
+  const [operatingCountries, setOperatingCountries] = useState<string[]>(org?.operatingCountries ?? [])
+  const [countryInput, setCountryInput] = useState("")
+
+  // Templates state
+  const [templates, setTemplates] = useState<MappingTemplate[]>(initialTemplates)
 
   // User form
   const [userName, setUserName] = useState(user?.name ?? "")
@@ -230,7 +241,51 @@ export function SettingsPage({ org, user, providers: initialProviders, simSettin
               <SelectContent>{TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <Button size="sm" disabled={saving} onClick={() => save("organization", { name: orgName, baseCurrency, reportingCurrency, timezone })}>
+          <div className="space-y-1.5 max-w-sm">
+            <Label className="text-xs">Operating countries</Label>
+            <div className="flex gap-2">
+              <Input
+                value={countryInput}
+                onChange={(e) => setCountryInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && countryInput.trim()) {
+                    e.preventDefault()
+                    const c = countryInput.trim()
+                    if (!operatingCountries.includes(c)) setOperatingCountries((prev) => [...prev, c])
+                    setCountryInput("")
+                  }
+                }}
+                placeholder="e.g. MX, US, CO"
+                maxLength={4}
+                className="h-8 text-xs"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0"
+                disabled={!countryInput.trim()}
+                onClick={() => {
+                  const c = countryInput.trim()
+                  if (c && !operatingCountries.includes(c)) setOperatingCountries((prev) => [...prev, c])
+                  setCountryInput("")
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            {operatingCountries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {operatingCountries.map((c) => (
+                  <span key={c} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">
+                    {c}
+                    <button type="button" onClick={() => setOperatingCountries((prev) => prev.filter((x) => x !== c))} className="hover:text-red-500 leading-none">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <Button size="sm" disabled={saving} onClick={() => save("organization", { name: orgName, baseCurrency, reportingCurrency, timezone, operatingCountries })}>
             {saving ? "Saving..." : "Save changes"}
           </Button>
         </div>
@@ -341,6 +396,7 @@ export function SettingsPage({ org, user, providers: initialProviders, simSettin
 
       {/* Upload settings */}
       {activeTab === "upload" && (
+        <div className="space-y-4">
         <div className="bg-white rounded-xl border p-6 space-y-5">
           <h2 className="text-sm font-semibold text-gray-700">Upload defaults</h2>
           <div className="space-y-1.5 max-w-xs">
@@ -372,6 +428,39 @@ export function SettingsPage({ org, user, providers: initialProviders, simSettin
             onClick={() => save("upload", { defaultDateFormat: dateFormat, directionPayLabel: payLabel, directionReceiveLabel: receiveLabel })}>
             {saving ? "Saving..." : "Save changes"}
           </Button>
+        </div>
+
+        {/* Saved mapping templates */}
+        <div className="bg-white rounded-xl border p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-700">Saved mapping templates</h2>
+          {templates.length === 0 ? (
+            <p className="text-sm text-gray-400">No templates saved yet. Save a template during file upload to see it here.</p>
+          ) : (
+            <div className="divide-y border rounded-lg overflow-hidden">
+              {templates.map((t) => (
+                <div key={t.id} className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-gray-800">{t.name}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-gray-400 hover:text-red-500"
+                    onClick={async () => {
+                      const res = await fetch(`/api/mappingtemplates/${t.id}`, { method: "DELETE" })
+                      if (res.ok) {
+                        setTemplates((prev) => prev.filter((x) => x.id !== t.id))
+                        toast.success("Template deleted.")
+                      } else {
+                        toast.error("Failed to delete template.")
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         </div>
       )}
     </div>

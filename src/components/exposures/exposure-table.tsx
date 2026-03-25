@@ -234,6 +234,20 @@ export function ExposureTable({ exposures, onDelete, onUpdate }: Props) {
         return <span className="text-sm text-gray-600">{row.original.counterparty ?? "—"}</span>
       },
     }),
+    columnHelper.accessor("notes", {
+      header: () => <span className="text-xs font-medium text-gray-500">Notes</span>,
+      cell: ({ row }) => {
+        if (editingId === row.original.id) {
+          return (
+            <Input value={editValues.notes ?? ""} onChange={(e) => setEditValues((v) => ({ ...v, notes: e.target.value }))}
+              className="h-7 w-36 text-xs" placeholder="Optional" />
+          )
+        }
+        const n = row.original.notes
+        if (!n) return <span className="text-sm text-gray-400">—</span>
+        return <span className="text-sm text-gray-600 max-w-[160px] truncate block" title={n}>{n}</span>
+      },
+    }),
     columnHelper.accessor("hedgingStatus", {
       header: () => <span className="text-xs font-medium text-gray-500">Hedging</span>,
       cell: ({ row }) => <HedgingBadge status={row.original.hedgingStatus} />,

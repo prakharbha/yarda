@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Plus, Download } from "lucide-react"
 import { ForwardsTable } from "./forwards-table"
 import { AddTradeDialog } from "./add-trade-dialog"
 import { toast } from "sonner"
+import { format } from "date-fns"
 
 interface TradeRow {
   id: string
@@ -66,6 +67,29 @@ export function ForwardsWallet({ initialTrades, providers }: Props) {
     }
   }
 
+  const exportCSV = () => {
+    const header = ["Trade Date", "Settlement Date", "Currency Pair", "Direction", "Notional", "Forward Rate", "Status", "Provider", "Notes"]
+    const rows = trades.map((t) => [
+      t.tradeDate ? format(new Date(t.tradeDate), "yyyy-MM-dd") : "",
+      format(new Date(t.settlementDate), "yyyy-MM-dd"),
+      t.currencyPair,
+      t.direction,
+      t.notional,
+      t.rate ?? "",
+      t.status,
+      t.provider?.name ?? "",
+      t.notes ?? "",
+    ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+    const csv = [header.join(","), ...rows].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `forwards-${format(new Date(), "yyyy-MM-dd")}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // Summary stats
   const active = trades.filter((t) => t.status === "ACTIVE")
   const totalByPair: Record<string, { buy: number; sell: number }> = {}
@@ -84,10 +108,18 @@ export function ForwardsWallet({ initialTrades, providers }: Props) {
             {active.length} active forward{active.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Add forward
-        </Button>
+        <div className="flex gap-2">
+          {trades.length > 0 && (
+            <Button size="sm" variant="outline" onClick={exportCSV}>
+              <Download className="h-4 w-4 mr-1.5" />
+              Export
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add forward
+          </Button>
+        </div>
       </div>
 
       {Object.keys(totalByPair).length > 0 && (
