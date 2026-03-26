@@ -19,7 +19,7 @@ export default async function DashboardLayout({
         <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
           {children}
         </main>
-        <footer className="shrink-0 border-t bg-white px-6 py-2.5 text-center text-xs text-gray-400">
+        <footer className="shrink-0 border-t bg-white px-6 py-3 text-center text-xs text-gray-400">
           MVP by{" "}
           <a
             href="https://nandann.com"
