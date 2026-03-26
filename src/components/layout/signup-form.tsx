@@ -13,14 +13,14 @@ export function SignupForm() {
     <form action={action} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="name">Your name</Label>
-        <Input id="name" name="name" placeholder="Alexia Ramos" required />
+        <Input id="name" name="name" placeholder="Full Name" required />
         {state?.errors?.name && (
           <p className="text-xs text-red-600">{state.errors.name[0]}</p>
         )}
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="organizationName">Company name</Label>
-        <Input id="organizationName" name="organizationName" placeholder="Acme Corp" required />
+        <Input id="organizationName" name="organizationName" placeholder="Your Company" required />
         {state?.errors?.organizationName && (
           <p className="text-xs text-red-600">{state.errors.organizationName[0]}</p>
         )}
