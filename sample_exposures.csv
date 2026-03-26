@@ -1,0 +1,11 @@
+Currency,Amount,Direction,Settlement Date,Entity / Subsidiary,Counterparty,Notes / Description
+USD,500000,pay,2026-06-30,HQ Mexico,Acme Corp,Annual software license renewal
+EUR,250000,receive,2026-05-15,Branch Monterrey,TechGmbH Berlin,Q2 consulting services
+GBP,125000,pay,2026-07-31,HQ Mexico,UK Supplier Ltd,Raw materials import
+USD,1000000,receive,2026-09-30,Branch Guadalajara,US Client Inc,Product export payment
+CAD,75000,pay,2026-04-30,HQ Mexico,Maple Logistics,Freight and customs fees
+EUR,300000,pay,2026-08-15,Branch Monterrey,EuroTech SL,Equipment purchase
+USD,200000,receive,2026-05-31,HQ Mexico,Miami Distributor,Distributor advance payment
+CHF,50000,pay,2026-06-15,HQ Mexico,Swiss Pharma AG,Patent licensing fee
+USD,450000,pay,2026-10-31,Branch Guadalajara,Asian Supplier Co,Inventory procurement Q4
+EUR,180000,receive,2026-07-15,Branch Monterrey,French Retailer SA,Summer collection order

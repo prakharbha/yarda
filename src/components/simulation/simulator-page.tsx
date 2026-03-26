@@ -167,7 +167,7 @@ export function SimulatorPage() {
       <div>
         <h1 className="text-xl font-semibold text-gray-900">FX Hedge Simulator</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Illustrative tool. Synthetic forward uses Banxico FIX, TIIE and FRED SOFR.
+          Illustrative tool. Spot rate via Twelve Data · Interest rates are estimated.
         </p>
       </div>
 
@@ -291,10 +291,10 @@ export function SimulatorPage() {
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Market Data Snapshot</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Banxico FIX (USD/MXN)", value: marketData.spot.value.toFixed(4), date: marketData.spot.date },
-              { label: "TIIE 28d", value: `${marketData.tiie28.value.toFixed(4)}%`, date: marketData.tiie28.date },
-              { label: "TIIE 91d", value: `${marketData.tiie91.value.toFixed(4)}%`, date: marketData.tiie91.date },
-              { label: "SOFR", value: `${(marketData.sofr.value * 100).toFixed(4)}%`, date: marketData.sofr.date },
+              { label: "USD/MXN Spot", value: marketData.spot.value.toFixed(4), date: marketData.spot.date },
+              { label: "TIIE 28d (est.)", value: `${marketData.tiie28.value.toFixed(2)}%`, date: marketData.tiie28.date },
+              { label: "TIIE 91d (est.)", value: `${marketData.tiie91.value.toFixed(2)}%`, date: marketData.tiie91.date },
+              { label: "SOFR (est.)", value: `${(marketData.sofr.value * 100).toFixed(2)}%`, date: marketData.sofr.date },
             ].map((item) => (
               <div key={item.label} className="space-y-0.5">
                 <p className="text-xs text-gray-500">{item.label}</p>
