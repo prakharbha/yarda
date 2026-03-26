@@ -5,18 +5,10 @@ import { z } from "zod"
 const TRADING_DAYS_PER_YEAR = 252
 const DAYS_PER_YEAR = 365
 
-function interpolateMxnRate(targetDays: number, tiie28Pct: number, tiie91Pct: number): number {
-  const r28 = tiie28Pct / 100
-  const r91 = tiie91Pct / 100
-  if (targetDays <= 28) return r28
-  if (targetDays >= 91) return r91
-  // linear interpolation
-  return r28 + (r91 - r28) * ((targetDays - 28) / (91 - 28))
-}
-
-function syntheticForward(spot: number, rMxn: number, rUsd: number, days: number, basis = 360): number {
+// Covered interest rate parity: Forward(FOREIGN/LOCAL) = Spot × (1 + rLocal×T) / (1 + rForeign×T)
+function syntheticForward(spot: number, rLocal: number, rForeign: number, days: number, basis = 360): number {
   const tau = days / basis
-  return spot * ((1 + rMxn * tau) / (1 + rUsd * tau))
+  return spot * ((1 + rLocal * tau) / (1 + rForeign * tau))
 }
 
 const inputSchema = z.object({
@@ -28,9 +20,8 @@ const inputSchema = z.object({
   hedgeRatios: z.array(z.number().min(0).max(1)).min(1),
   // Market data (passed from client to avoid re-fetching)
   spot: z.number().positive(),
-  tiie28: z.number().positive(),
-  tiie91: z.number().positive(),
-  sofr: z.number(), // decimal
+  rForeign: z.number(), // decimal, e.g. 0.0433 for 4.33%
+  rLocal: z.number(),   // decimal, e.g. 0.09 for 9%
   spotHistory: z.array(z.object({ date: z.string(), spot: z.number() })),
 })
 
@@ -50,9 +41,8 @@ export async function POST(req: NextRequest) {
     settlementDate,
     hedgeRatios,
     spot: spotRef,
-    tiie28,
-    tiie91,
-    sofr,
+    rForeign,
+    rLocal,
     spotHistory,
   } = parsed.data
 
@@ -60,26 +50,10 @@ export async function POST(req: NextRequest) {
   const settleDate = new Date(settlementDate)
   const calendarDays = Math.max(1, Math.round((settleDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
 
-  const mxnRate = interpolateMxnRate(calendarDays, tiie28, tiie91)
-  const usdRate = sofr
-
-  // Always compute forward for USD/MXN, then invert if pair is reversed
-  const synForwardUsdMxn = syntheticForward(spotRef, mxnRate, usdRate, calendarDays, 360)
-
-  let forwardRate: number
-  let spotDisplay: number
-  let forwardPoints: number
-  const isUsdMxn = foreignCurrency === "USD" && localCurrency === "MXN"
-
-  if (isUsdMxn) {
-    forwardRate = synForwardUsdMxn
-    spotDisplay = spotRef
-    forwardPoints = synForwardUsdMxn - spotRef
-  } else {
-    forwardRate = 1 / synForwardUsdMxn
-    spotDisplay = 1 / spotRef
-    forwardPoints = forwardRate - spotDisplay
-  }
+  // spotRef and spotHistory are both FOREIGN/LOCAL — no inversion needed
+  const forwardRate = syntheticForward(spotRef, rLocal, rForeign, calendarDays, 360)
+  const spotDisplay = spotRef
+  const forwardPoints = forwardRate - spotRef
 
   // Tenor in trading days
   const tenorTradingDays = Math.max(1, Math.round(calendarDays * (TRADING_DAYS_PER_YEAR / DAYS_PER_YEAR)))
@@ -91,15 +65,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Generate scenarios using de-meaned historical moves
+  // Generate scenarios using de-meaned historical moves on FOREIGN/LOCAL directly
   const pctMoves: number[] = []
   for (let i = 0; i < spotHistory.length - tenorTradingDays; i++) {
     const startSpot = spotHistory[i].spot
     const endSpot = spotHistory[i + tenorTradingDays].spot
-    // invert if MXN/USD
-    const startS = isUsdMxn ? startSpot : 1 / startSpot
-    const endS = isUsdMxn ? endSpot : 1 / endSpot
-    pctMoves.push(endS / startS - 1)
+    pctMoves.push(endSpot / startSpot - 1)
   }
 
   const meanMove = pctMoves.reduce((a, b) => a + b, 0) / pctMoves.length
@@ -118,10 +89,7 @@ export async function POST(req: NextRequest) {
     const demeanedMove = pctMove - meanMove
     const simSpot = forwardRate * (1 + demeanedMove)
 
-    // Cash impact in local currency
-    const unhedgedLocal = direction === "pay"
-      ? notional * simSpot  // paying foreign, cost in local
-      : notional * simSpot  // receiving foreign, proceeds in local
+    const unhedgedLocal = notional * simSpot
 
     const hedgedLocals: Record<string, number> = {}
     const pnls: Record<string, number> = {}
@@ -154,20 +122,17 @@ export async function POST(req: NextRequest) {
     const key = String(Math.round(ratio * 100))
     const pnlValues = scenarios.map((s) => s.pnls[key]).sort((a, b) => a - b)
     const n = pnlValues.length
-    const p5Index = Math.floor(n * 0.05)
-    const p95Index = Math.floor(n * 0.95)
-    const medianIndex = Math.floor(n / 2)
     summary[key] = {
       worst: pnlValues[0],
       best: pnlValues[n - 1],
       average: pnlValues.reduce((a, b) => a + b, 0) / n,
-      p5: pnlValues[p5Index],
-      p95: pnlValues[p95Index],
-      median: pnlValues[medianIndex],
+      p5: pnlValues[Math.floor(n * 0.05)],
+      p95: pnlValues[Math.floor(n * 0.95)],
+      median: pnlValues[Math.floor(n / 2)],
     }
   }
 
-  // Distribution data for violin/density chart (sampled to limit payload)
+  // Distribution data (sampled to limit payload)
   const MAX_POINTS = 1000
   const step = Math.max(1, Math.floor(scenarios.length / MAX_POINTS))
   const distributionData: Record<string, number[]> = {}
@@ -183,8 +148,8 @@ export async function POST(req: NextRequest) {
       spotDisplay: parseFloat(spotDisplay.toFixed(4)),
       forwardRate: parseFloat(forwardRate.toFixed(4)),
       forwardPoints: parseFloat(forwardPoints.toFixed(4)),
-      mxnRate: parseFloat((mxnRate * 100).toFixed(4)),
-      usdRate: parseFloat((usdRate * 100).toFixed(4)),
+      rLocalPct: parseFloat((rLocal * 100).toFixed(2)),
+      rForeignPct: parseFloat((rForeign * 100).toFixed(2)),
       calendarDays,
       tenorTradingDays,
       baselineCost: parseFloat(baselineCost.toFixed(2)),

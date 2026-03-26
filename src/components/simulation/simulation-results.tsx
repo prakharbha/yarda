@@ -20,8 +20,8 @@ interface PricingData {
   spotDisplay: number
   forwardRate: number
   forwardPoints: number
-  mxnRate: number
-  usdRate: number
+  rLocalPct: number
+  rForeignPct: number
   calendarDays: number
   tenorTradingDays: number
   baselineCost: number
@@ -166,8 +166,8 @@ export function SimulationResults({ result, direction, foreignCurrency, settleme
             { label: `Synthetic Forward`, value: pricing.forwardRate.toFixed(4) },
             { label: "Forward Points", value: pricing.forwardPoints.toFixed(4) },
             { label: "Calendar Days", value: String(pricing.calendarDays) },
-            { label: "Implied MXN Rate", value: `${pricing.mxnRate.toFixed(4)}%` },
-            { label: "USD Rate (SOFR)", value: `${pricing.usdRate.toFixed(4)}%` },
+            { label: `${localCurrency} Rate (est.)`, value: `${pricing.rLocalPct.toFixed(2)}%` },
+            { label: `${foreignCurrency} Rate (est.)`, value: `${pricing.rForeignPct.toFixed(2)}%` },
           ].map((item) => (
             <div key={item.label} className="space-y-0.5">
               <p className="text-xs text-gray-500">{item.label}</p>
@@ -193,7 +193,7 @@ export function SimulationResults({ result, direction, foreignCurrency, settleme
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700">Simulation Summary</h2>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">{scenarioCount.toLocaleString()} historical scenarios · Banxico FIX history</span>
+            <span className="text-xs text-gray-400">{scenarioCount.toLocaleString()} historical scenarios via Twelve Data</span>
             <Button size="sm" variant="outline" onClick={downloadCSV} className="h-7 text-xs gap-1.5">
               <Download className="h-3.5 w-3.5" />
               Download CSV
@@ -306,8 +306,8 @@ export function SimulationResults({ result, direction, foreignCurrency, settleme
       )}
 
       <p className="text-xs text-gray-400 pb-2">
-        This simulation is illustrative only. Scenarios are generated from de-meaned historical USD/MXN spot moves
-        (Banxico FIX, ~20 years). Past performance does not guarantee future results. Not financial advice.
+        This simulation is illustrative only. Scenarios are generated from de-meaned historical spot moves via Twelve Data.
+        Interest rates are estimated. Past performance does not guarantee future results. Not financial advice.
       </p>
     </div>
   )

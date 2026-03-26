@@ -15,10 +15,10 @@ import {
 import { SimulationResults } from "./simulation-results"
 
 interface MarketData {
+  symbol: string
   spot: { value: number; date: string }
-  tiie28: { value: number; date: string }
-  tiie91: { value: number; date: string }
-  sofr: { value: number; date: string }
+  rForeign: { value: number; currency: string; date: string }
+  rLocal: { value: number; currency: string; date: string }
   spotHistory: { date: string; spot: number }[]
 }
 
@@ -27,8 +27,8 @@ interface SimulationOutput {
     spotDisplay: number
     forwardRate: number
     forwardPoints: number
-    mxnRate: number
-    usdRate: number
+    rLocalPct: number
+    rForeignPct: number
     calendarDays: number
     tenorTradingDays: number
     baselineCost: number
@@ -49,10 +49,32 @@ const HEDGE_RATIO_OPTIONS = [
   { value: 1.0, label: "100% (Fully hedged)" },
 ]
 
+const CURRENCIES = [
+  { code: "USD", label: "USD — US Dollar" },
+  { code: "EUR", label: "EUR — Euro" },
+  { code: "GBP", label: "GBP — British Pound" },
+  { code: "JPY", label: "JPY — Japanese Yen" },
+  { code: "CAD", label: "CAD — Canadian Dollar" },
+  { code: "CHF", label: "CHF — Swiss Franc" },
+  { code: "AUD", label: "AUD — Australian Dollar" },
+  { code: "NZD", label: "NZD — New Zealand Dollar" },
+  { code: "SEK", label: "SEK — Swedish Krona" },
+  { code: "NOK", label: "NOK — Norwegian Krone" },
+  { code: "DKK", label: "DKK — Danish Krone" },
+  { code: "MXN", label: "MXN — Mexican Peso" },
+  { code: "BRL", label: "BRL — Brazilian Real" },
+  { code: "COP", label: "COP — Colombian Peso" },
+  { code: "CLP", label: "CLP — Chilean Peso" },
+  { code: "PEN", label: "PEN — Peruvian Sol" },
+  { code: "CNY", label: "CNY — Chinese Yuan" },
+  { code: "HKD", label: "HKD — Hong Kong Dollar" },
+  { code: "SGD", label: "SGD — Singapore Dollar" },
+]
+
 export function SimulatorPage() {
   const searchParams = useSearchParams()
 
-  // Inputs — pre-fill from URL params if coming from Exposure Tracker
+  // Pre-fill from URL params if coming from Exposure Tracker
   const defaultDirection = (searchParams.get("direction") as "pay" | "receive") ?? "pay"
   const defaultCurrency = searchParams.get("currency") ?? "USD"
   const defaultNotional = searchParams.get("notional") ?? "1000000"
@@ -81,7 +103,7 @@ export function SimulatorPage() {
     if (set) setSettlementDate(set)
   }, [searchParams])
 
-  // State
+  // Clear market data whenever the currency pair changes
   const [marketData, setMarketData] = useState<MarketData | null>(null)
   const [marketLoading, setMarketLoading] = useState(false)
   const [marketError, setMarketError] = useState<string | null>(null)
@@ -89,12 +111,28 @@ export function SimulatorPage() {
   const [simLoading, setSimLoading] = useState(false)
   const [simError, setSimError] = useState<string | null>(null)
 
+  const handleForeignChange = (v: string) => {
+    setForeignCurrency(v)
+    setMarketData(null)
+    setSimResult(null)
+  }
+
+  const handleLocalChange = (v: string) => {
+    setLocalCurrency(v)
+    setMarketData(null)
+    setSimResult(null)
+  }
+
   const fetchMarketData = async () => {
+    if (foreignCurrency === localCurrency) {
+      setMarketError("Foreign and local currencies must differ.")
+      return
+    }
     setMarketLoading(true)
     setMarketError(null)
     setSimResult(null)
     try {
-      const res = await fetch("/api/market")
+      const res = await fetch(`/api/market?foreign=${foreignCurrency}&local=${localCurrency}`)
       if (!res.ok) {
         const data = await res.json()
         setMarketError(data.error ?? "Failed to fetch market data.")
@@ -137,9 +175,8 @@ export function SimulatorPage() {
           settlementDate,
           hedgeRatios: selectedRatios,
           spot: marketData.spot.value,
-          tiie28: marketData.tiie28.value,
-          tiie91: marketData.tiie91.value,
-          sofr: marketData.sofr.value,
+          rForeign: marketData.rForeign.value,
+          rLocal: marketData.rLocal.value,
           spotHistory: marketData.spotHistory,
         }),
       })
@@ -162,12 +199,17 @@ export function SimulatorPage() {
     )
   }
 
+  // Options for local currency dropdown (exclude selected foreign)
+  const localOptions = CURRENCIES.filter((c) => c.code !== foreignCurrency)
+  // Options for foreign currency dropdown (exclude selected local)
+  const foreignOptions = CURRENCIES.filter((c) => c.code !== localCurrency)
+
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-xl font-semibold text-gray-900">FX Hedge Simulator</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Illustrative tool. Spot rate via Twelve Data · Interest rates are estimated.
+          Illustrative tool. Spot rates via Twelve Data · Interest rates are estimated.
         </p>
       </div>
 
@@ -189,22 +231,24 @@ export function SimulatorPage() {
 
           <div className="space-y-1.5">
             <Label className="text-xs">Foreign currency</Label>
-            <Select value={foreignCurrency} onValueChange={(v) => v && setForeignCurrency(v)}>
+            <Select value={foreignCurrency} onValueChange={(v) => v && handleForeignChange(v)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="USD">USD</SelectItem>
-                <SelectItem value="MXN">MXN</SelectItem>
+                {foreignOptions.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs">Local currency</Label>
-            <Select value={localCurrency} onValueChange={(v) => v && setLocalCurrency(v)}>
+            <Select value={localCurrency} onValueChange={(v) => v && handleLocalChange(v)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="MXN">MXN</SelectItem>
-                <SelectItem value="USD">USD</SelectItem>
+                {localOptions.map((c) => (
+                  <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -218,7 +262,15 @@ export function SimulatorPage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Notional ({foreignCurrency})</Label>
-            <Input type="number" min="1000" step="1000" value={notional} onChange={(e) => setNotional(e.target.value)} className="h-9" placeholder="1,000,000" />
+            <Input
+              type="number"
+              min="1000"
+              step="1000"
+              value={notional}
+              onChange={(e) => setNotional(e.target.value)}
+              className="h-9"
+              placeholder="1,000,000"
+            />
           </div>
         </div>
 
@@ -248,7 +300,7 @@ export function SimulatorPage() {
             size="sm"
             disabled={marketLoading}
           >
-            {marketLoading ? "Fetching..." : marketData ? "Refresh market data" : "Load market data"}
+            {marketLoading ? "Fetching..." : marketData ? `Refresh ${foreignCurrency}/${localCurrency}` : `Load ${foreignCurrency}/${localCurrency} data`}
           </Button>
           <Button
             onClick={runSimulation}
@@ -267,7 +319,7 @@ export function SimulatorPage() {
             <strong>{Number(notional).toLocaleString()} {foreignCurrency}</strong>{" "}
             in exchange for <strong>{localCurrency}</strong> on{" "}
             <strong>{new Date(settlementDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>.
-            {!marketData && " Load market data to run the simulation."}
+            {!marketData && ` Click "Load ${foreignCurrency}/${localCurrency} data" to run the simulation.`}
           </p>
         )}
 
@@ -288,13 +340,15 @@ export function SimulatorPage() {
       {/* Market data snapshot */}
       {marketData && (
         <div className="bg-white rounded-xl border p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Market Data Snapshot</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">
+            Market Data Snapshot — <span className="text-gray-500 font-normal">{marketData.symbol}</span>
+          </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "USD/MXN Spot", value: marketData.spot.value.toFixed(4), date: marketData.spot.date },
-              { label: "TIIE 28d (est.)", value: `${marketData.tiie28.value.toFixed(2)}%`, date: marketData.tiie28.date },
-              { label: "TIIE 91d (est.)", value: `${marketData.tiie91.value.toFixed(2)}%`, date: marketData.tiie91.date },
-              { label: "SOFR (est.)", value: `${(marketData.sofr.value * 100).toFixed(2)}%`, date: marketData.sofr.date },
+              { label: `${marketData.symbol} Spot`, value: marketData.spot.value.toFixed(4), date: marketData.spot.date },
+              { label: `${marketData.rForeign.currency} Rate (est.)`, value: `${(marketData.rForeign.value * 100).toFixed(2)}%`, date: marketData.rForeign.date },
+              { label: `${marketData.rLocal.currency} Rate (est.)`, value: `${(marketData.rLocal.value * 100).toFixed(2)}%`, date: marketData.rLocal.date },
+              { label: "History points", value: String(marketData.spotHistory.length), date: `from ${marketData.spotHistory[0]?.date ?? "—"}` },
             ].map((item) => (
               <div key={item.label} className="space-y-0.5">
                 <p className="text-xs text-gray-500">{item.label}</p>
