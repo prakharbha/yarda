@@ -25,6 +25,7 @@ const POLICY_RATES: Record<string, number> = {
   CNY: 0.020,   // PBoC LPR ~2.0%
   HKD: 0.043,   // HKMA (pegged to USD) ~4.3%
   SGD: 0.035,   // MAS ~3.5%
+  INR: 0.0625,  // RBI repo ~6.25%
 }
 
 async function fetchPairData(symbol: string, apiKey: string) {

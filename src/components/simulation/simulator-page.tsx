@@ -69,6 +69,7 @@ const CURRENCIES = [
   { code: "CNY", label: "CNY — Chinese Yuan" },
   { code: "HKD", label: "HKD — Hong Kong Dollar" },
   { code: "SGD", label: "SGD — Singapore Dollar" },
+  { code: "INR", label: "INR — Indian Rupee" },
 ]
 
 export function SimulatorPage() {
